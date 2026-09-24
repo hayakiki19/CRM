@@ -1,0 +1,140 @@
+{
+  "theme": {
+    "mode": "light",
+    "style": "Clean modern SaaS interface, minimal and professional with high information density",
+    "background": "#F8FAFC",
+    "card_background": "#FFFFFF",
+    "foreground_text": "#0F172A",
+    "muted_text": "#64748B",
+    "border_color": "#E2E8F0",
+    "primary_accent": "#2563EB",
+    "primary_hover": "#1D4ED8",
+    "primary_light": "#EFF6FF",
+    "accent_gradients": "Strictly limited to subtle blue ambient glow or crisp solid borders",
+    "customizable_branding": {
+      "support": true,
+      "parameters": ["org_name", "org_logo_url", "primary_color", "accent_color", "dark_sidebar_option"]
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit, Plus Jakarta Sans, sans-serif",
+    "body_font": "Inter, system-ui, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "hierarchy": {
+      "h1_hero": "text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900",
+      "h2_section": "text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight text-slate-900",
+      "h3_card": "text-lg font-semibold text-slate-800 tracking-tight",
+      "body_text": "text-sm sm:text-base text-slate-600 leading-relaxed",
+      "caption_label": "text-xs font-medium uppercase tracking-wider text-slate-400"
+    }
+  },
+  "layout_and_navigation": {
+    "structure": "Sidebar + Header + Scrollable Content Area + Command Palette (Cmd+K) + Global Slide-Over Panel",
+    "sidebar": {
+      "type": "Collapsible responsive rail with search, organization selector, main nav sections, quick add menu, and user settings",
+      "sections": [
+        "Dashboard",
+        "Leads",
+        "Pipeline",
+        "Contacts",
+        "Companies",
+        "Deals",
+        "Clients",
+        "Projects",
+        "Tasks",
+        "Proposals",
+        "Contracts",
+        "Invoices",
+        "Payments",
+        "Website Connections",
+        "Forms",
+        "Website Leads",
+        "Analytics",
+        "Marketing",
+        "Campaigns",
+        "Content",
+        "Communication",
+        "Reports",
+        "AI Assistant",
+        "Settings"
+      ]
+    },
+    "grid_modes": {
+      "dashboard_bento": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 align-start",
+      "kanban_board": "flex overflow-x-auto gap-4 p-2 min-h-[600px] snap-x",
+      "table_view": "bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm shadow-slate-100"
+    }
+  },
+  "colors": {
+    "slate_base": {
+      "50": "#F8FAFC",
+      "100": "#F1F5F9",
+      "200": "#E2E8F0",
+      "300": "#CBD5E1",
+      "400": "#94A3B8",
+      "500": "#64748B",
+      "600": "#475569",
+      "700": "#334155",
+      "800": "#1E293B",
+      "900": "#0F172A"
+    },
+    "blue_accent": {
+      "50": "#EFF6FF",
+      "100": "#DBEAFE",
+      "500": "#3B82F6",
+      "600": "#2563EB",
+      "700": "#1D4ED8"
+    },
+    "status_badges": {
+      "new_lead": "bg-blue-50 text-blue-700 border-blue-200",
+      "won_deal": "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "lost_deal": "bg-rose-50 text-rose-700 border-rose-200",
+      "pending_payment": "bg-amber-50 text-amber-700 border-amber-200",
+      "in_progress": "bg-indigo-50 text-indigo-700 border-indigo-200"
+    }
+  },
+  "component_strategies": {
+    "tables": "Sticky table header, batch selection checkboxes, quick search input, column filter dropdowns, row click slide-over drawer, pagination, export options",
+    "kanban": "Drag and drop column stages with stage total values, lead count indicators, card priority badges, quick deal creation",
+    "forms": "Floating labelless or crisp-labeled inputs with subtext validation, Shadcn Select / Popover / DatePicker primitives",
+    "charts": "Recharts AreaChart / BarChart with soft gradient fills, clean tooltip cards, legend toggles",
+    "ai_assistant": "Interactive slide-over or dedicated tab assistant with predefined prompt chips (e.g. 'Summarize overdue deals', 'Draft follow-up email', 'Predict pipeline forecast')"
+  },
+  "image_urls": {
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMGF2YXRhciUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MDI2MTIxN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Executive male avatar portrait"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1607746882042-944635dfe10e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMGF2YXRhciUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MDI2MTIxN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Female manager avatar portrait"
+      },
+      {
+        "url": "https://images.pexels.com/photos/37148308/pexels-photo-37148308.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Senior sales executive portrait"
+      }
+    ],
+    "team_and_workspace": [
+      {
+        "url": "https://images.unsplash.com/photo-1557804506-669a67965ba0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwxfHxjb3Jwb3JhdGUlMjBvZmZpY2UlMjB3b3Jrc3BhY2UlMjB0ZWFtfGVufDB8fHx8MTc5MDI2MTIyNXww&ixlib=rb-4.1.0&q=85",
+        "description": "Team planning session"
+      },
+      {
+        "url": "https://images.pexels.com/photos/8190827/pexels-photo-8190827.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Modern office collaboration"
+      }
+    ]
+  },
+  "testing_and_accessibility": {
+    "data_testid_convention": "kebab-case, role-based, e.g., data-testid='nav-leads-link', data-testid='dashboard-kpi-revenue', data-testid='lead-stage-kanban-board', data-testid='create-deal-button'",
+    "wcag": "Contrast ratio minimum 4.5:1 for standard text, 3:1 for large headers and icons. All interactive controls support keyboard focus states."
+  },
+  "instructions_to_main_agent": [
+    "Build a production-grade, highly functional, and fully responsive generic CRM SaaS dashboard.",
+    "Ensure all 24 specified navigation tabs (Dashboard, Leads, Pipeline, Contacts, Companies, Deals, Clients, Projects, Tasks, Proposals, Contracts, Invoices, Payments, Website Connections, Forms, Website Leads, Analytics, Marketing, Campaigns, Content, Communication, Reports, AI Assistant, Settings) are functional and well-structured.",
+    "Implement Organization Branding customization in Settings so users can change Org Name, Primary Accent Color, and Logo.",
+    "Include a global Command Search bar (Cmd+K / Ctrl+K), Quick Actions modal, and AI Assistant feature.",
+    "Make sure every interactive element includes a valid data-testid attribute for stable testing."
+  ]
+}
