@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 5 full-stack testing of the new detailed Leads page. Backend: added /app/backend/tests/test_leads_detail.py (7 new tests) covering PUT contacted/last_contacted_at/follow_up_date persistence, POST/GET /api/activities filtered by entity_id, org-scoped list, client role 403 on activity create, and convert->Qualified+converted=true. All 36 backend tests pass (29 existing + 7 new). Frontend: exhaustively verified /leads page: 10 status chips render with correct counts (All 17, Not Contacted 16, New 10, Contacted 2, Qualified 3, Meeting 1, Proposal 1, Negotiation 0, Won 0, Lost 0), search input filters rows (empty state on no-match), status chips filter rows (Qualified -> 4 rows, filter-source Website -> 5 rows), deep link /leads?new=1 auto-opens create dialog, create-leads-button->save-lead-button creates row visible in table, row click opens lead-detail-sheet, mark-contacted-button toggles to mark-not-contacted-button, quick-stage-qualified moves stage, add-note-input+add-note-button appends note to timeline (persisted via /api/activities), followup-input date persists, convert-lead-button converts and closes sheet. Regression: client@demo.com still redirected away from /leads (leads-page not rendered).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Create Lead Dialog & Sheet", "issues": ["Radix a11y console warnings: DialogContent missing Description/aria-describedby; some sub-Dialog (likely Command palette) missing DialogTitle. Non-blocking but should be addressed for accessibility."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_leads_detail.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_convert_features.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/iteration_5_results.xml"
+  ],
+  "action_items": [
+    "Optional: wrap CommandDialog / non-titled DialogContents with VisuallyHidden DialogTitle + DialogDescription to silence Radix a11y warnings."
+  ],
+  "critical_code_review_comments": [
+    "Leads.jsx (353 lines) is well-structured but dense; consider extracting LeadDetailSheet and LeadFormDialog into separate components for maintainability.",
+    "patch() in Leads.jsx swallows errors silently with `catch { load(); }` — should surface a toast on failure so the optimistic UI rollback is visible to users.",
+    "server.py generic list_resource copies all query_params into the Mongo scope filter. This is convenient but risky: any user-provided key becomes a filter (e.g. ?created_by=<other>) — consider a whitelist per resource.",
+    "server.py is now ~1048 lines; still recommend splitting into routers (auth, leads, deals, activities, public) for readability."
+  ],
+  "updated_files": ["/app/backend/tests/test_leads_detail.py"],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "100% of tested flows passed"},
+  "test_credentials": "Owner glennmuyskens78776@outlook.com / Admin@12345; Client client@demo.com / Client@12345",
+  "seed_data_creation": "TEST_LeadDetail, TEST_LeadConvertUI (backend fixtures, auto cleaned); TEST_UI_<ts> lead created & deleted during UI test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `cd /app && python -m pytest backend/tests/ -v -o addopts=''` -> expect 36 passed. New Leads UI covered end-to-end. Radix a11y warnings are the only non-blocking issue."
+}
