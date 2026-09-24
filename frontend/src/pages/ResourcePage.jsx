@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { apiGet, apiPost, apiPut, apiDelete, money, formatApiError } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { apiGet, apiPost, apiPut, apiDelete, money, formatApiError, http } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Pencil, Trash2, Inbox } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Inbox, Upload, Download } from "lucide-react";
 import { toast } from "sonner";
 
 function resolveOptions(opt, org) {
@@ -38,6 +38,39 @@ export default function ResourcePage({ cfg }) {
   };
   // reload when the config (route) changes
   useEffect(() => { setItems(null); load(); /* eslint-disable-next-line */ }, [cfg.resource, cfg.title]);
+
+  const [team, setTeam] = useState([]);
+  useEffect(() => {
+    const needsTeam = cfg.fields.some((f) => f.type === "user") || cfg.columns.some((c) => c.type === "user");
+    if (needsTeam) apiGet("/team").then(setTeam).catch(() => {});
+  }, [cfg.resource]); // eslint-disable-line
+  const teamMap = useMemo(() => Object.fromEntries(team.map((m) => [m.user_id, m.name])), [team]);
+
+  const fileRef = useRef(null);
+  const [importing, setImporting] = useState(false);
+  const onExport = async () => {
+    try {
+      const res = await http.get(`/${cfg.resource}/export`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${cfg.resource}_export.xlsx`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Exported to Excel");
+    } catch { toast.error("Export failed"); }
+  };
+  const onImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await http.post(`/${cfg.resource}/import`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success(`Imported ${data.created} leads${data.skipped_duplicates ? `, skipped ${data.skipped_duplicates} duplicates` : ""}`);
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail) || "Import failed"); }
+    finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
 
   const filtered = useMemo(() => {
     if (!items) return [];
@@ -79,6 +112,7 @@ export default function ResourcePage({ cfg }) {
         <span className="text-xs text-slate-500">{v || 0}</span>
       </div>
     );
+    if (col.type === "user") return <span className="text-slate-600">{teamMap[v] || "—"}</span>;
     if (col.primary) return <span className="font-medium text-slate-800">{v || "—"}</span>;
     return <span className="text-slate-600">{v || "—"}</span>;
   };
@@ -91,7 +125,16 @@ export default function ResourcePage({ cfg }) {
           <p className="text-slate-500 text-sm mt-1">{cfg.subtitle}</p>
         </div>
         {!cfg.hideCreate && (
-          <Button onClick={openCreate} data-testid={`create-${cfg.resource}-button`}><Plus className="h-4 w-4 mr-1.5" />New {cfg.title.replace(/s$/, "")}</Button>
+          <div className="flex items-center gap-2">
+            {cfg.importExport && (
+              <>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onImport} data-testid="import-file-input" />
+                <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={importing} data-testid="import-leads-button"><Upload className="h-4 w-4 mr-1.5" />{importing ? "Importing…" : "Import"}</Button>
+                <Button variant="outline" onClick={onExport} data-testid="export-leads-button"><Download className="h-4 w-4 mr-1.5" />Export</Button>
+              </>
+            )}
+            <Button onClick={openCreate} data-testid={`create-${cfg.resource}-button`}><Plus className="h-4 w-4 mr-1.5" />New {cfg.title.replace(/s$/, "")}</Button>
+          </div>
         )}
       </div>
 
@@ -148,6 +191,11 @@ export default function ResourcePage({ cfg }) {
                 <Label className="text-xs">{f.label}{f.required && <span className="text-rose-500"> *</span>}</Label>
                 {f.type === "textarea" ? (
                   <Textarea value={form[f.name] || ""} onChange={(e) => setForm({ ...form, [f.name]: e.target.value })} className="mt-1" data-testid={`field-${f.name}`} />
+                ) : f.type === "user" ? (
+                  <Select value={form[f.name] || ""} onValueChange={(v) => setForm({ ...form, [f.name]: v })}>
+                    <SelectTrigger className="mt-1" data-testid={`field-${f.name}`}><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                    <SelectContent>{team.map((m) => <SelectItem key={m.user_id} value={m.user_id}>{m.name} · {String(m.role).replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+                  </Select>
                 ) : f.type === "select" ? (
                   <Select value={form[f.name] || ""} onValueChange={(v) => setForm({ ...form, [f.name]: v })}>
                     <SelectTrigger className="mt-1" data-testid={`field-${f.name}`}><SelectValue placeholder="Select…" /></SelectTrigger>

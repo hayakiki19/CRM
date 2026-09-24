@@ -57,8 +57,9 @@ export default function Settings() {
 
   const addMember = async () => {
     try {
-      await apiPost("/team", member);
-      toast.success("Team member added"); setMemberOpen(false); setMember({ name: "", email: "", password: "", role: "member" });
+      const created = await apiPost("/team", member);
+      toast.success(`Invited ${created.name} · temp password: ${member.password || "Welcome@123"}`);
+      setMemberOpen(false); setMember({ name: "", email: "", password: "", role: "member" });
       apiGet("/team").then(setTeam);
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -115,7 +116,7 @@ export default function Settings() {
           <Card className="p-6 border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-800">Team Members</h3>
-              <Button size="sm" onClick={() => setMemberOpen(true)} data-testid="add-member-button"><Plus className="h-4 w-4 mr-1.5" />Add Member</Button>
+              <Button size="sm" onClick={() => setMemberOpen(true)} data-testid="add-member-button"><Plus className="h-4 w-4 mr-1.5" />Invite Member</Button>
             </div>
             <div className="space-y-2">
               {team.map((m) => (
@@ -149,7 +150,7 @@ export default function Settings() {
 
       <Dialog open={memberOpen} onOpenChange={setMemberOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Team Member</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Invite Team Member</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label>Name</Label><Input value={member.name} onChange={(e) => setMember({ ...member, name: e.target.value })} data-testid="member-name-input" /></div>
             <div><Label>Email</Label><Input type="email" value={member.email} onChange={(e) => setMember({ ...member, email: e.target.value })} data-testid="member-email-input" /></div>
@@ -160,12 +161,13 @@ export default function Settings() {
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="sales_executive">Sales Executive</SelectItem>
                   <SelectItem value="member">Team Member</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter><Button onClick={addMember} data-testid="save-member-button">Add Member</Button></DialogFooter>
+          <DialogFooter><Button onClick={addMember} data-testid="save-member-button">Send Invite</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

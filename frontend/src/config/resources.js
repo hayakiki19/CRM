@@ -3,7 +3,7 @@
 
 export const RESOURCE_CONFIGS = {
   leads: {
-    resource: "leads", title: "Leads", subtitle: "Capture and qualify every prospect",
+    resource: "leads", title: "Leads", subtitle: "Capture and qualify every prospect", importExport: true,
     columns: [
       { key: "name", label: "Name", primary: true },
       { key: "email", label: "Email" },
@@ -12,6 +12,7 @@ export const RESOURCE_CONFIGS = {
       { key: "status", label: "Status", type: "badge" },
       { key: "score", label: "Score", type: "score" },
       { key: "budget", label: "Budget", type: "money" },
+      { key: "assigned_user_id", label: "Assigned", type: "user" },
     ],
     fields: [
       { name: "name", label: "Full name", required: true },
@@ -26,6 +27,7 @@ export const RESOURCE_CONFIGS = {
       { name: "score", label: "Lead score", type: "number" },
       { name: "status", label: "Status", type: "select", options: "$stages" },
       { name: "follow_up_date", label: "Follow-up date", type: "date" },
+      { name: "assigned_user_id", label: "Assign to", type: "user" },
       { name: "notes", label: "Notes", type: "textarea", full: true },
     ],
   },

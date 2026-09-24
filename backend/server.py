@@ -5,8 +5,10 @@ import os
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
+from fastapi.responses import PlainTextResponse, StreamingResponse
+import io
+import pandas as pd
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
@@ -442,6 +444,124 @@ async def analytics_overview(user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Leads import / export & assignment
+# ---------------------------------------------------------------------------
+LEAD_FIELD_ALIASES = {
+    "name": ["name", "full name", "lead name", "contact", "contact name", "first name"],
+    "email": ["email", "e-mail", "email address", "mail"],
+    "phone": ["phone", "mobile", "phone number", "contact number", "tel", "telephone"],
+    "company": ["company", "organization", "organisation", "business", "company name", "account"],
+    "website": ["website", "url", "site", "web"],
+    "location": ["location", "city", "country", "address", "region", "state"],
+    "source": ["source", "lead source", "channel"],
+    "service": ["service", "product", "interest", "service interest"],
+    "budget": ["budget", "deal size", "amount"],
+    "score": ["score", "lead score", "rating"],
+    "status": ["status", "stage", "lead status"],
+    "notes": ["notes", "comment", "comments", "message", "remarks", "description"],
+}
+
+
+def _match_lead_field(col: str):
+    c = str(col).strip().lower()
+    for field, aliases in LEAD_FIELD_ALIASES.items():
+        if c == field or c in aliases:
+            return field
+    return None
+
+
+@api.post("/leads/import")
+async def import_leads(file: UploadFile = File(...), user: dict = Depends(require_roles("owner", "admin", "manager", "sales_executive", "member"))):
+    content = await file.read()
+    fname = (file.filename or "").lower()
+    try:
+        if fname.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(content))
+        else:
+            df = pd.read_excel(io.BytesIO(content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
+
+    mapping = {}
+    for col in df.columns:
+        f = _match_lead_field(col)
+        if f and f not in mapping.values():
+            mapping[col] = f
+    if "name" not in mapping.values() and "email" not in mapping.values():
+        raise HTTPException(status_code=400, detail="File must contain at least a Name or Email column")
+
+    org_id = user["org_id"]
+    existing_emails = set()
+    for l in await db.leads.find({"org_id": org_id}, {"_id": 0, "email": 1}).to_list(20000):
+        if l.get("email"):
+            existing_emails.add(l["email"].lower())
+
+    docs, created, skipped = [], 0, 0
+    for _, row in df.iterrows():
+        lead = {}
+        for col, field in mapping.items():
+            val = row[col]
+            if pd.isna(val):
+                continue
+            lead[field] = val if isinstance(val, (int, float)) else str(val).strip()
+        if not lead.get("name") and not lead.get("email"):
+            continue
+        email = str(lead.get("email", "")).lower().strip()
+        if email and email in existing_emails:
+            skipped += 1
+            continue
+        if email:
+            existing_emails.add(email)
+        docs.append({
+            "id": new_id("lead"), "org_id": org_id,
+            "name": lead.get("name") or email or "Imported Lead",
+            "email": email, "phone": str(lead.get("phone", "")),
+            "company": lead.get("company", ""), "website": lead.get("website", ""),
+            "location": lead.get("location", ""), "source": lead.get("source", "") or "Import",
+            "service": lead.get("service", ""), "budget": str(lead.get("budget", "")),
+            "score": int(lead.get("score") or 0) if str(lead.get("score", "")).strip() not in ("", "nan") else 0,
+            "status": lead.get("status", "") or "New", "notes": lead.get("notes", ""),
+            "created_at": now_iso(), "created_by": user["user_id"],
+        })
+        created += 1
+    if docs:
+        await db.leads.insert_many(docs)
+    return {"created": created, "skipped_duplicates": skipped, "columns_mapped": sorted(set(mapping.values()))}
+
+
+@api.get("/leads/export")
+async def export_leads(user: dict = Depends(get_current_user)):
+    if user.get("role") == "client":
+        raise HTTPException(status_code=403, detail="Not allowed")
+    leads = await db.leads.find({"org_id": user["org_id"]}, {"_id": 0}).to_list(20000)
+    cols = ["name", "email", "phone", "company", "website", "location", "source", "service",
+            "budget", "score", "status", "assigned_name", "follow_up_date", "notes", "created_at"]
+    rows = [{c: l.get(c, "") for c in cols} for l in leads]
+    df = pd.DataFrame(rows, columns=cols)
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Leads")
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=leads_export.xlsx"},
+    )
+
+
+@api.post("/leads/{lead_id}/assign")
+async def assign_lead(lead_id: str, payload: Dict[str, Any], user: dict = Depends(require_roles("owner", "admin", "manager", "sales_executive"))):
+    assignee = payload.get("user_id")
+    member = await db.users.find_one({"user_id": assignee, "org_id": user["org_id"]}, {"_id": 0})
+    if not member:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.leads.update_one(
+        {"id": lead_id, "org_id": user["org_id"]},
+        {"$set": {"assigned_user_id": assignee, "assigned_name": member.get("name")}},
+    )
+    return {"ok": True, "assigned_to": member.get("name")}
+
+
+# ---------------------------------------------------------------------------
 # Generic CRUD
 # ---------------------------------------------------------------------------
 def build_scope(user: dict, resource: str) -> dict:
@@ -518,6 +638,9 @@ async def update_resource(resource: str, item_id: str, payload: Dict[str, Any], 
     merged = {**existing, **payload}
     if resource == "invoices":
         merged = compute_invoice_totals(merged)
+    if resource == "leads" and "assigned_user_id" in payload:
+        m = await db.users.find_one({"user_id": payload["assigned_user_id"], "org_id": user["org_id"]}, {"_id": 0})
+        merged["assigned_name"] = m.get("name") if m else ""
     merged["updated_at"] = now_iso()
     await db[RESOURCES[resource]].update_one({"id": item_id, "org_id": user["org_id"]}, {"$set": merged})
     merged.pop("_id", None)
