@@ -15,6 +15,7 @@ import Reports from "@/pages/Reports";
 import AIAssistant from "@/pages/AIAssistant";
 import Settings from "@/pages/Settings";
 import ClientPortal from "@/pages/ClientPortal";
+import Leads from "@/pages/Leads";
 import ResourcePage from "@/pages/ResourcePage";
 import { RESOURCE_CONFIGS } from "@/config/resources";
 
@@ -49,7 +50,7 @@ function AppRoutes() {
       <Route path="/reports" element={<Protected><Reports /></Protected>} />
       <Route path="/ai" element={<Protected><AIAssistant /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
-      <Route path="/leads" element={R("leads")} />
+      <Route path="/leads" element={<Protected><Leads /></Protected>} />
       <Route path="/contacts" element={R("contacts")} />
       <Route path="/companies" element={R("companies")} />
       <Route path="/deals" element={R("deals")} />
