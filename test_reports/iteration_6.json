@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 6 full-stack testing of the unified Pipeline interlink feature. Backend: created /app/backend/tests/test_pipeline_interlink.py with 9 tests covering (a) GET /api/pipeline returns leads+deals with kind/stage/value shape, (b) client role gets 403 on /api/pipeline, (c) POST /api/leads auto-creates linked contact + company (verified via /api/leads/{id}, /api/contacts, /api/companies), (d) POST /api/pipeline/lead/{id}/stage persists stage for Contacted, (e) Proposal stage creates linked proposal draft (lead_id set), (f) Negotiation creates linked contract draft, (g) Won triggers lead->deal conversion + client & project creation + proposals marked Accepted (verified in /api/deals, /api/proposals; converted lead removed from pipeline feed), (h) client role 403 on stage move, (i) Deal Proposal stage creates linked proposal (deal_id). All 9 tests pass. Frontend: Pipeline page (/pipeline) renders all 8 stage columns, legend Lead/Deal visible, 16 lead-card-* + 15 deal-card-* rendered, Contacted column contains lead cards; created new lead via /leads?new=1 dialog and confirmed auto-linked contact (visible on /contacts) and company (visible on /companies); quick-stage-proposal on lead detail slide-over shows 'Proposal draft created' toast and the linked proposal appears on /proposals; client@demo.com is redirected away from /pipeline (board not rendered).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sheet (lead detail) / Dialogs", "issues": ["Radix a11y console warnings persist: 'DialogContent requires a DialogTitle' emitted twice on lead detail sheet interactions. Non-blocking; wrap missing titles with VisuallyHidden."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pipeline_interlink.py",
+    "/app/test_reports/pytest/iteration_6_results.xml"
+  ],
+  "action_items": [
+    "Optional a11y: add VisuallyHidden DialogTitle/DialogDescription to Sheet/CommandDialog to silence Radix warnings.",
+    "Native HTML5 drag-and-drop on Pipeline was not simulated in Playwright (browsers don't dispatch synthetic dragstart reliably); the underlying endpoint POST /api/pipeline/{kind}/{id}/stage is validated end-to-end via backend tests + the Leads quick-stage buttons which call the same endpoint."
+  ],
+  "critical_code_review_comments": [
+    "server.py apply_stage_effects: idempotency check uses (org_id, key=entity['id']) which is good — repeated moves to Proposal/Negotiation won't duplicate drafts.",
+    "server.py won_conversion: acts logically but does not append proposals-accepted (that is in apply_stage_effects for 'won'); currently order is apply_stage_effects then won_conversion, which is correct.",
+    "Pipeline.jsx has no data-testid on the stage-legend chips; consider adding them for future assertions.",
+    "server.py is now ~1180 lines — still recommend splitting into routers.",
+    "list_resource still passes raw query_params into scope; unchanged risk from iteration 5."
+  ],
+  "updated_files": ["/app/backend/tests/test_pipeline_interlink.py"],
+  "success_rate": {"backend": "100% (9/9 new + prior 36 remain)", "frontend": "100% of tested flows passed"},
+  "test_credentials": "Owner glennmuyskens78776@outlook.com / Admin@12345; Client client@demo.com / Client@12345",
+  "seed_data_creation": "TEST_Interlink*, TEST_StageLead*, TEST_StageCo*, TEST_Deal*, TEST_DealCo* (via backend tests); TEST_UI_<ts>* lead+contact+company via UI. Not auto-cleaned.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `cd /app && REACT_APP_BACKEND_URL=<preview_url> python -m pytest backend/tests/test_pipeline_interlink.py -v -o addopts=''` -> expect 9 passed. Full pipeline interlink verified end-to-end. HTML5 drag is not automated; rely on quick-stage buttons + backend tests for stage move coverage."
+}
