@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { apiGet, apiPost, apiPut, apiDelete, money, formatApiError, http } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusBadge from "@/components/StatusBadge";
@@ -10,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Pencil, Trash2, Inbox, Upload, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Inbox, Upload, Download, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 function resolveOptions(opt, org) {
@@ -81,6 +82,23 @@ export default function ResourcePage({ cfg }) {
 
   const openCreate = () => { setEditing(null); setForm({ ...(cfg.defaults || {}) }); setDialogOpen(true); };
   const openEdit = (it) => { setEditing(it); setForm({ ...it }); setDialogOpen(true); };
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("new") === "1" && !cfg.hideCreate) {
+      openCreate();
+      searchParams.delete("new");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, cfg.resource]); // eslint-disable-line
+
+  const doConvert = async (it) => {
+    try {
+      await apiPost(`/${cfg.resource}/${it.id}/convert`, {});
+      toast.success(cfg.convert.successMsg);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -169,7 +187,12 @@ export default function ResourcePage({ cfg }) {
                   <TableRow key={it.id} className="hover:bg-slate-50/70 cursor-pointer" data-testid={`row-${cfg.resource}-${it.id}`} onClick={() => openEdit(it)}>
                     {cfg.columns.map((c) => <TableCell key={c.key}>{renderCell(c, it)}</TableCell>)}
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 justify-end">
+                        {cfg.convert && !it.converted && (
+                          <Button size="sm" variant="ghost" className="h-8 text-primary hover:text-primary hover:bg-blue-50 font-medium" onClick={() => doConvert(it)} data-testid={`convert-${it.id}`}>
+                            {cfg.convert.short}<ArrowRight className="h-3.5 w-3.5 ml-1" />
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(it)} data-testid={`edit-${it.id}`}><Pencil className="h-3.5 w-3.5 text-slate-500" /></Button>
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => remove(it)} data-testid={`delete-${it.id}`}><Trash2 className="h-3.5 w-3.5 text-rose-500" /></Button>
                       </div>

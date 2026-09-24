@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiGet, money } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import {
@@ -11,9 +12,9 @@ import StatusBadge from "@/components/StatusBadge";
 
 const COLORS = ["#2563EB", "#60A5FA", "#818CF8", "#34D399", "#FBBF24", "#F472B6", "#A78BFA", "#94A3B8"];
 
-function Kpi({ icon: Icon, label, value, tint }) {
+function Kpi({ icon: Icon, label, value, tint, onClick }) {
   return (
-    <Card className="p-5 border-slate-200 shadow-sm hover:shadow-md transition-shadow" data-testid={`dashboard-kpi-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+    <Card onClick={onClick} className={`p-5 border-slate-200 shadow-sm hover:shadow-md transition-shadow ${onClick ? "cursor-pointer hover:border-primary/40" : ""}`} data-testid={`dashboard-kpi-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <div className="flex items-center justify-between">
         <div className={`h-10 w-10 rounded-xl grid place-items-center ${tint}`}><Icon className="h-5 w-5" /></div>
       </div>
@@ -25,6 +26,7 @@ function Kpi({ icon: Icon, label, value, tint }) {
 
 export default function Dashboard() {
   const [s, setS] = useState(null);
+  const navigate = useNavigate();
   useEffect(() => { apiGet("/dashboard/stats").then(setS).catch(() => {}); }, []);
   if (!s) return <div className="p-16 text-center text-slate-400">Loading dashboard…</div>;
 
@@ -36,14 +38,14 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi icon={Users} label="Total Leads" value={s.leads} tint="bg-blue-50 text-blue-600" />
-        <Kpi icon={TrendingUp} label="Conversion Rate" value={`${s.conversion_rate}%`} tint="bg-indigo-50 text-indigo-600" />
-        <Kpi icon={DollarSign} label="Pipeline Value" value={money(s.pipeline_value)} tint="bg-violet-50 text-violet-600" />
-        <Kpi icon={Trophy} label="Won Deals" value={s.won_deals} tint="bg-emerald-50 text-emerald-600" />
-        <Kpi icon={DollarSign} label="Revenue" value={money(s.revenue)} tint="bg-emerald-50 text-emerald-600" />
-        <Kpi icon={AlertCircle} label="Outstanding" value={money(s.outstanding)} tint="bg-amber-50 text-amber-600" />
-        <Kpi icon={Briefcase} label="Active Clients" value={s.active_clients} tint="bg-sky-50 text-sky-600" />
-        <Kpi icon={Globe} label="Website Leads" value={s.website_leads} tint="bg-rose-50 text-rose-600" />
+        <Kpi icon={Users} label="Total Leads" value={s.leads} tint="bg-blue-50 text-blue-600" onClick={() => navigate("/leads")} />
+        <Kpi icon={TrendingUp} label="Conversion Rate" value={`${s.conversion_rate}%`} tint="bg-indigo-50 text-indigo-600" onClick={() => navigate("/pipeline")} />
+        <Kpi icon={DollarSign} label="Pipeline Value" value={money(s.pipeline_value)} tint="bg-violet-50 text-violet-600" onClick={() => navigate("/pipeline")} />
+        <Kpi icon={Trophy} label="Won Deals" value={s.won_deals} tint="bg-emerald-50 text-emerald-600" onClick={() => navigate("/deals")} />
+        <Kpi icon={DollarSign} label="Revenue" value={money(s.revenue)} tint="bg-emerald-50 text-emerald-600" onClick={() => navigate("/invoices")} />
+        <Kpi icon={AlertCircle} label="Outstanding" value={money(s.outstanding)} tint="bg-amber-50 text-amber-600" onClick={() => navigate("/invoices")} />
+        <Kpi icon={Briefcase} label="Active Clients" value={s.active_clients} tint="bg-sky-50 text-sky-600" onClick={() => navigate("/clients")} />
+        <Kpi icon={Globe} label="Website Leads" value={s.website_leads} tint="bg-rose-50 text-rose-600" onClick={() => navigate("/website-leads")} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">

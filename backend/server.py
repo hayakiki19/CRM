@@ -561,6 +561,34 @@ async def assign_lead(lead_id: str, payload: Dict[str, Any], user: dict = Depend
     return {"ok": True, "assigned_to": member.get("name")}
 
 
+@api.post("/leads/{lead_id}/convert")
+async def convert_lead(lead_id: str, user: dict = Depends(get_current_user)):
+    if user.get("role") == "client":
+        raise HTTPException(status_code=403, detail="Not allowed")
+    lead = await db.leads.find_one({"id": lead_id, "org_id": user["org_id"]}, {"_id": 0})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    try:
+        value = float(str(lead.get("budget", "0")).replace(",", "").replace("$", "").strip() or 0)
+    except Exception:
+        value = 0
+    deal = {
+        "id": new_id("deal"), "org_id": user["org_id"],
+        "title": f"{lead.get('company') or lead.get('name')} deal",
+        "company": lead.get("company", ""), "email": lead.get("email", ""),
+        "value": value, "stage": "Qualified", "lead_id": lead_id,
+        "assigned_user_id": lead.get("assigned_user_id"), "assigned_name": lead.get("assigned_name"),
+        "expected_close": (datetime.now(timezone.utc) + timedelta(days=21)).isoformat()[:10],
+        "created_at": now_iso(), "created_by": user["user_id"],
+    }
+    await db.deals.insert_one(deal)
+    await db.leads.update_one({"id": lead_id, "org_id": user["org_id"]},
+                              {"$set": {"status": "Qualified", "converted": True, "deal_id": deal["id"]}})
+    deal.pop("_id", None)
+    await log_activity(user["org_id"], "lead", lead_id, "Converted lead to deal", user["user_id"])
+    return {"deal": deal}
+
+
 # ---------------------------------------------------------------------------
 # Generic CRUD
 # ---------------------------------------------------------------------------

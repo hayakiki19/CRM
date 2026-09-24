@@ -4,6 +4,7 @@
 export const RESOURCE_CONFIGS = {
   leads: {
     resource: "leads", title: "Leads", subtitle: "Capture and qualify every prospect", importExport: true,
+    convert: { short: "Convert to Deal", successMsg: "Lead converted to a deal — see Pipeline" },
     columns: [
       { key: "name", label: "Name", primary: true },
       { key: "email", label: "Email" },
@@ -57,6 +58,7 @@ export const RESOURCE_CONFIGS = {
   },
   deals: {
     resource: "deals", title: "Deals", subtitle: "Every opportunity in your pipeline",
+    convert: { short: "Convert to Client", successMsg: "Deal converted — client & project created" },
     columns: [
       { key: "title", label: "Deal", primary: true }, { key: "company", label: "Company" },
       { key: "value", label: "Value", type: "money" }, { key: "stage", label: "Stage", type: "badge" },
