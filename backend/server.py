@@ -703,6 +703,8 @@ async def apply_payment(org_id: str, payment: dict):
 # ---------------------------------------------------------------------------
 @api.post("/deals/{deal_id}/convert")
 async def convert_deal(deal_id: str, user: dict = Depends(get_current_user)):
+    if user.get("role") == "client":
+        raise HTTPException(status_code=403, detail="Not allowed")
     deal = await db.deals.find_one({"id": deal_id, "org_id": user["org_id"]}, {"_id": 0})
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found")

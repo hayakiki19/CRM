@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 3: Verified interlinking/navigation features. Backend: 28/29 pytest pass (5 new convert tests + 24 regression). One security bug: /api/deals/{deal_id}/convert lacks the client-role guard that /api/leads/{id}/convert has, so a logged-in client user could convert deals in their org (returns 200 instead of 403). Frontend Playwright E2E: all critical flows pass — owner login OK; Dashboard KPI cards (Total Leads, Pipeline Value, Active Clients) navigate correctly; Leads page shows 12 'Convert to Deal' row actions (data-testid convert-<leadId>) — clicking POSTs /api/leads/{id}/convert, toast success, row hides; Deals page shows 9 'Convert to Client' row actions with correct label; Header Quick-Add 'New' menu -> New Lead navigates to /leads and auto-opens create dialog (title 'New Lead'); New Deal auto-opens deal create dialog; Cmd+K (Ctrl+K) opens CommandDialog with command-input; typing 'invoices' + selecting command-invoices navigates to /invoices; clicking global-search opens palette; deep link /clients?new=1 auto-opens the New Client dialog.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/deals/{deal_id}/convert", "issue": "Missing client-role guard; a client-role user can convert any deal in their org (creates client+project, marks deal Won). Should return 403 like /api/leads/{id}/convert. Add: if user.get('role') == 'client': raise HTTPException(403, 'Not allowed') at start of convert_deal (server.py ~line 705).", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CommandDialog + create dialogs", "issues": ["Radix warnings: DialogContent missing Description/aria-describedby; CommandDialog inner DialogContent requires DialogTitle for a11y (wrap with VisuallyHidden). Non-blocking but flooding console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_convert_features.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iteration_3_results.xml"
+  ],
+  "action_items": [
+    "Add client-role 403 guard at top of convert_deal() in /app/backend/server.py (mirror the check in convert_lead).",
+    "Optional a11y polish: add DialogDescription to create/edit dialogs and wrap Command palette DialogTitle with VisuallyHidden to remove console warnings."
+  ],
+  "critical_code_review_comments": [
+    "Security parity gap: convert_lead enforces role != client but convert_deal does not — clients technically shouldn't have UI to reach it but the API is exposed and should defense-in-depth 403.",
+    "convert_deal does not persist deal.value into the created client consistently vs lead->deal budget parsing (minor).",
+    "Layout.jsx CommandDialog: no Quick-create for Client/Task/Invoice in the palette (only Lead/Deal) — inconsistent with the header Quick-Add menu which lists all five. Consider adding for parity.",
+    "server.py still ~1046 lines; split into routers as feature surface grows."
+  ],
+  "updated_files": ["/app/backend/tests/test_convert_features.py"],
+  "success_rate": {"backend": "97% (28/29)", "frontend": "100%"},
+  "test_credentials": "Owner glennmuyskens78776@outlook.com / Admin@12345; Client client@demo.com / Client@12345",
+  "seed_data_creation": "Test creates TEST-prefixed leads/deals/clients/projects during runs, all cleaned up in teardown.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app && python -m pytest backend/tests/ -v -o addopts='' — expect 29/29 after main agent adds client 403 guard to convert_deal. Frontend testids introduced this iteration: convert-<leadId>, convert-<dealId>, quick-add-button, quick-add-lead, quick-add-deal, global-search, command-input, command-<slug>, dashboard-kpi-<label-slug>. Deep-link ?new=1 auto-open works on all resources with hideCreate=false.",
+  "rca of the issue": "convert_deal endpoint (server.py ~L704) was implemented without the `if user.get('role') == 'client': raise HTTPException(403)` guard that exists in convert_lead (L566-567). Reproduction: login as client@demo.com, obtain any deal_id in same org, POST /api/deals/{id}/convert -> returns 200 with new client+project. Mitigation: add the two-line role check at the top of convert_deal."
+}
