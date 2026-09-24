@@ -120,6 +120,18 @@ export default function Leads() {
     catch { load(); }
   };
 
+  const moveStage = async (l, stage) => {
+    const updated = { ...l, status: stage };
+    setLeads((ls) => ls.map((x) => (x.id === l.id ? updated : x)));
+    if (detail?.id === l.id) setDetail(updated);
+    try {
+      const r = await apiPost(`/pipeline/lead/${l.id}/stage`, { stage });
+      (r.actions || []).forEach((a) => toast.success(a));
+      if (!r.actions?.length) toast.success(`Moved to ${stage}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); load(); }
+  };
+
   const remove = async (l) => {
     if (!window.confirm("Delete this lead?")) return;
     await apiDelete(`/leads/${l.id}`); toast.success("Deleted"); setDetail(null); load();
@@ -311,7 +323,7 @@ export default function Leads() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Move stage</p>
                   <div className="flex flex-wrap gap-1.5">
                     {stages.map((s) => (
-                      <button key={s} data-testid={`quick-stage-${slug(s)}`} onClick={() => patch(detail, { status: s }, `Moved to ${s}`)}
+                      <button key={s} data-testid={`quick-stage-${slug(s)}`} onClick={() => moveStage(detail, s)}
                         className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${detail.status === s ? "bg-primary text-white border-primary" : "bg-white text-slate-600 border-slate-200 hover:border-primary"}`}>{s}</button>
                     ))}
                   </div>

@@ -590,6 +590,136 @@ async def convert_lead(lead_id: str, user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Unified Sales Pipeline (leads + deals) with interlinked stage effects
+# ---------------------------------------------------------------------------
+def parse_amount(v):
+    try:
+        return float(str(v).replace(",", "").replace("$", "").strip() or 0)
+    except Exception:
+        return 0.0
+
+
+async def ensure_contact_company(org_id: str, lead: dict):
+    updates = {}
+    company_id = lead.get("company_id")
+    if lead.get("company") and not company_id:
+        comp = await db.companies.find_one({"org_id": org_id, "name": lead["company"]}, {"_id": 0})
+        if not comp:
+            comp = {"id": new_id("company"), "org_id": org_id, "name": lead["company"],
+                    "website": lead.get("website", ""), "location": lead.get("location", ""), "created_at": now_iso()}
+            await db.companies.insert_one(comp)
+        updates["company_id"] = comp["id"]
+    if not lead.get("contact_id") and (lead.get("email") or lead.get("name")):
+        contact = await db.contacts.find_one({"org_id": org_id, "email": lead.get("email", "")}, {"_id": 0}) if lead.get("email") else None
+        if not contact:
+            contact = {"id": new_id("contact"), "org_id": org_id, "name": lead.get("name", ""),
+                       "email": lead.get("email", ""), "phone": lead.get("phone", ""), "company": lead.get("company", ""),
+                       "company_id": updates.get("company_id"), "lead_id": lead["id"], "created_at": now_iso()}
+            await db.contacts.insert_one(contact)
+        updates["contact_id"] = contact["id"]
+    if updates:
+        await db.leads.update_one({"id": lead["id"], "org_id": org_id}, {"$set": updates})
+    return updates
+
+
+async def apply_stage_effects(org_id: str, kind: str, entity: dict, stage: str, user_id: str):
+    actions = []
+    key = "lead_id" if kind == "lead" else "deal_id"
+    title = entity.get("title") or entity.get("name") or "Opportunity"
+    company = entity.get("company", "")
+    amount = parse_amount(entity.get("value") or entity.get("budget"))
+    st = str(stage).lower()
+    if st == "proposal":
+        exists = await db.proposals.find_one({"org_id": org_id, key: entity["id"]}, {"_id": 0})
+        if not exists:
+            await db.proposals.insert_one({"id": new_id("prop"), "org_id": org_id, "title": f"{company or title} Proposal",
+                                           "type": "proposal", "amount": amount, "status": "Draft", "client_name": company,
+                                           key: entity["id"], "created_at": now_iso()})
+            actions.append("Proposal draft created")
+    if st == "negotiation":
+        exists = await db.contracts.find_one({"org_id": org_id, key: entity["id"]}, {"_id": 0})
+        if not exists:
+            await db.contracts.insert_one({"id": new_id("ctr"), "org_id": org_id, "title": f"{company or title} Agreement",
+                                           "type": "contract", "amount": amount, "status": "Draft",
+                                           key: entity["id"], "created_at": now_iso()})
+            actions.append("Contract draft created")
+    if st == "won":
+        r = await db.proposals.update_many({"org_id": org_id, key: entity["id"]}, {"$set": {"status": "Accepted"}})
+        if r.modified_count:
+            actions.append("Linked proposal(s) marked Accepted")
+    return actions
+
+
+async def won_conversion(org_id: str, kind: str, entity: dict, user_id: str):
+    acts = []
+    if kind == "lead" and not entity.get("converted"):
+        deal = {"id": new_id("deal"), "org_id": org_id,
+                "title": f"{entity.get('company') or entity.get('name')} deal", "company": entity.get("company", ""),
+                "email": entity.get("email", ""), "value": parse_amount(entity.get("budget")), "stage": "Won",
+                "lead_id": entity["id"], "assigned_user_id": entity.get("assigned_user_id"),
+                "assigned_name": entity.get("assigned_name"), "created_at": now_iso()}
+        await db.deals.insert_one(deal)
+        await db.leads.update_one({"id": entity["id"], "org_id": org_id},
+                                  {"$set": {"converted": True, "deal_id": deal["id"], "status": "Won"}})
+        acts.append("Lead converted to a Won deal")
+        entity, kind = deal, "deal"
+    if kind == "deal" and not entity.get("client_created"):
+        client = {"id": new_id("client"), "org_id": org_id, "name": entity.get("company") or entity.get("title", "New Client"),
+                  "email": entity.get("email", ""), "company": entity.get("company", ""), "status": "active",
+                  "value": parse_amount(entity.get("value")), "created_at": now_iso()}
+        await db.clients.insert_one(client)
+        project = {"id": new_id("project"), "org_id": org_id, "client_id": client["id"],
+                   "name": entity.get("title") or entity.get("company", "New Project"), "status": "active",
+                   "progress": 0, "milestones": [], "created_at": now_iso()}
+        await db.projects.insert_one(project)
+        await db.deals.update_one({"id": entity["id"], "org_id": org_id},
+                                  {"$set": {"converted": True, "client_created": True, "client_id": client["id"], "project_id": project["id"]}})
+        acts.append("Client & project created")
+    return acts
+
+
+@api.get("/pipeline")
+async def pipeline_feed(user: dict = Depends(get_current_user)):
+    if user.get("role") == "client":
+        raise HTTPException(status_code=403, detail="Not allowed")
+    org_id = user["org_id"]
+    leads = await db.leads.find({"org_id": org_id, "converted": {"$ne": True}}, {"_id": 0}).to_list(5000)
+    deals = await db.deals.find({"org_id": org_id}, {"_id": 0}).to_list(5000)
+    items = []
+    for l in leads:
+        items.append({"id": l["id"], "kind": "lead", "title": l.get("name"), "company": l.get("company", ""),
+                      "stage": l.get("status") or "New", "value": parse_amount(l.get("budget")), "email": l.get("email", ""),
+                      "assigned_name": l.get("assigned_name"), "score": l.get("score", 0), "contacted": bool(l.get("contacted"))})
+    for d in deals:
+        items.append({"id": d["id"], "kind": "deal", "title": d.get("title"), "company": d.get("company", ""),
+                      "stage": d.get("stage") or "New", "value": parse_amount(d.get("value")), "email": d.get("email", ""),
+                      "assigned_name": d.get("assigned_name")})
+    return items
+
+
+@api.post("/pipeline/{kind}/{item_id}/stage")
+async def pipeline_move(kind: str, item_id: str, payload: Dict[str, Any], user: dict = Depends(get_current_user)):
+    if user.get("role") == "client":
+        raise HTTPException(status_code=403, detail="Not allowed")
+    if kind not in ("lead", "deal"):
+        raise HTTPException(status_code=400, detail="Invalid kind")
+    stage = payload.get("stage")
+    org_id = user["org_id"]
+    coll = "leads" if kind == "lead" else "deals"
+    field = "status" if kind == "lead" else "stage"
+    entity = await db[coll].find_one({"id": item_id, "org_id": org_id}, {"_id": 0})
+    if not entity:
+        raise HTTPException(status_code=404, detail="Not found")
+    await db[coll].update_one({"id": item_id, "org_id": org_id}, {"$set": {field: stage}})
+    entity[field] = stage
+    actions = await apply_stage_effects(org_id, kind, entity, stage, user["user_id"])
+    if str(stage).lower() == "won":
+        actions += await won_conversion(org_id, kind, entity, user["user_id"])
+    await log_activity(org_id, kind, item_id, f"Moved to {stage}", user["user_id"])
+    return {"ok": True, "stage": stage, "actions": actions}
+
+
+# ---------------------------------------------------------------------------
 # Generic CRUD
 # ---------------------------------------------------------------------------
 def build_scope(user: dict, resource: str) -> dict:
@@ -631,6 +761,8 @@ async def create_resource(resource: str, payload: Dict[str, Any], user: dict = D
     await db[RESOURCES[resource]].insert_one(doc)
     doc.pop("_id", None)
     await log_activity(user["org_id"], resource, doc["id"], f"Created {resource[:-1]}", user["user_id"])
+    if resource == "leads":
+        await ensure_contact_company(user["org_id"], doc)
     # event hooks
     if resource == "deals" and str(doc.get("stage", "")).lower() == "won":
         await run_automations(user["org_id"], "deal_won", {**doc, "entity_type": "deal", "entity_id": doc["id"]})

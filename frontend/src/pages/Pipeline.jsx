@@ -1,36 +1,36 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPut, apiPost, money, formatApiError } from "@/lib/api";
+import { apiGet, apiPost, money, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, GripVertical } from "lucide-react";
+import { Plus, GripVertical, User, Handshake } from "lucide-react";
 import { toast } from "sonner";
 
-const STAGE_TINT = {
-  Won: "border-t-emerald-400", Lost: "border-t-rose-400", New: "border-t-blue-400",
-};
+const STAGE_TINT = { Won: "border-t-emerald-400", Lost: "border-t-rose-400", New: "border-t-blue-400" };
 
 export default function Pipeline() {
   const { org } = useAuth();
   const stages = org?.pipeline_stages || [];
-  const [deals, setDeals] = useState([]);
+  const [items, setItems] = useState([]);
   const [drag, setDrag] = useState(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", value: "", company: "", stage: stages[0] });
 
-  const load = () => apiGet("/deals").then(setDeals).catch(() => {});
+  const load = () => apiGet("/pipeline").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
 
-  const move = async (deal, stage) => {
-    if (deal.stage === stage) return;
-    setDeals((ds) => ds.map((d) => (d.id === deal.id ? { ...d, stage } : d)));
+  const move = async (item, stage) => {
+    if (item.stage === stage) return;
+    setItems((its) => its.map((i) => (i.id === item.id && i.kind === item.kind ? { ...i, stage } : i)));
     try {
-      await apiPut(`/deals/${deal.id}`, { stage });
-      if (stage === "Won") toast.success("Deal won! Client & project auto-created.");
-    } catch { load(); }
+      const r = await apiPost(`/pipeline/${item.kind}/${item.id}/stage`, { stage });
+      (r.actions || []).forEach((a) => toast.success(a));
+      if (!r.actions?.length) toast.success(`Moved to ${stage}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); load(); }
   };
 
   const create = async () => {
@@ -44,18 +44,22 @@ export default function Pipeline() {
 
   return (
     <div className="max-w-full animate-fade-up">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900">Pipeline</h1>
-          <p className="text-slate-500 text-sm mt-1">Drag deals across stages. Drop into <b>Won</b> to auto-convert.</p>
+          <p className="text-slate-500 text-sm mt-1">Leads &amp; deals in one flow. Drag to move a stage — it updates the lead/deal and auto-creates proposals, contracts and clients.</p>
         </div>
         <Button onClick={() => setOpen(true)} data-testid="create-deal-button"><Plus className="h-4 w-4 mr-1.5" />New Deal</Button>
+      </div>
+      <div className="flex items-center gap-4 mb-4 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-slate-200 border border-slate-300" />Lead</span>
+        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100 border border-blue-300" />Deal</span>
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-4 kanban-scroll" data-testid="pipeline-board">
         {stages.map((stage) => {
-          const col = deals.filter((d) => d.stage === stage);
-          const total = col.reduce((a, d) => a + (Number(d.value) || 0), 0);
+          const col = items.filter((i) => i.stage === stage);
+          const total = col.reduce((a, i) => a + (Number(i.value) || 0), 0);
           return (
             <div key={stage} className="w-72 shrink-0"
               onDragOver={(e) => e.preventDefault()}
@@ -68,16 +72,25 @@ export default function Pipeline() {
                 </div>
                 <div className="px-3 pb-1 text-xs text-slate-400">{money(total)}</div>
                 <div className="p-2 space-y-2 min-h-[120px]">
-                  {col.map((d) => (
-                    <div key={d.id} draggable onDragStart={() => setDrag(d)} onDragEnd={() => setDrag(null)}
-                      className="bg-white border border-slate-200 rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-primary hover:shadow-sm transition-all group"
-                      data-testid={`deal-card-${d.id}`}>
+                  {col.map((i) => (
+                    <div key={`${i.kind}-${i.id}`} draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(null)}
+                      className={`bg-white border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:shadow-sm transition-all group ${i.kind === "deal" ? "border-blue-200 hover:border-primary" : "border-slate-200 hover:border-slate-400"}`}
+                      data-testid={`${i.kind}-card-${i.id}`}>
                       <div className="flex items-start gap-1">
                         <GripVertical className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{d.title}</p>
-                          <p className="text-xs text-slate-400 truncate">{d.company || "—"}</p>
-                          <p className="text-sm font-semibold text-primary mt-1.5 tabular-nums">{money(d.value)}</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${i.kind === "deal" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"}`}>
+                              {i.kind === "deal" ? <Handshake className="h-3 w-3" /> : <User className="h-3 w-3" />}{i.kind}
+                            </span>
+                            {i.kind === "lead" && i.contacted && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Contacted" />}
+                          </div>
+                          <p className="text-sm font-medium text-slate-800 truncate mt-1">{i.title}</p>
+                          <p className="text-xs text-slate-400 truncate">{i.company || i.email || "—"}</p>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <p className="text-sm font-semibold text-primary tabular-nums">{money(i.value)}</p>
+                            {i.assigned_name && <span className="text-[10px] text-slate-400 truncate max-w-[90px]">{i.assigned_name}</span>}
+                          </div>
                         </div>
                       </div>
                     </div>
